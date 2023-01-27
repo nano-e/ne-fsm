@@ -1,0 +1,11 @@
+[workspace]
+
+members = [
+    "nefsm",
+    "examples/basic",
+    "examples/fsm-tokio",
+    "macro",
+]
+exclude = ["testing/wasm-tests"]
+
+resolver = "2"
