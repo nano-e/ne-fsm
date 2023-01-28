@@ -1,0 +1,120 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'nefsm'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=nefsm"
+                ],
+                "filter": {
+                    "name": "nefsm",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'basic'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=basic",
+                    "--package=basic"
+                ],
+                "filter": {
+                    "name": "basic",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'basic'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=basic",
+                    "--package=basic"
+                ],
+                "filter": {
+                    "name": "basic",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'attribute_macro'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=attribute_macro",
+                    "--package=nefsm_macro"
+                ],
+                "filter": {
+                    "name": "attribute_macro",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'fsm-tokio'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=fsm-tokio",
+                    "--package=fsm-tokio"
+                ],
+                "filter": {
+                    "name": "fsm-tokio",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'fsm-tokio'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=fsm-tokio",
+                    "--package=fsm-tokio"
+                ],
+                "filter": {
+                    "name": "fsm-tokio",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

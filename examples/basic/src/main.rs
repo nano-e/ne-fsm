@@ -12,7 +12,7 @@ use nefsm::Stateful;
 pub enum State {
     Null,
     Starting,
-    Ready,
+    Ready,    
 }
 
 // impl FsmEnum<State, Context, Event> for State{
@@ -50,12 +50,12 @@ impl ToString for Event {
 impl nefsm::Stateful<State, Context, Event> for Null {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
         println!("Null state on enter");
-        nefsm::Response::Handled
+        nefsm::Response::Transition(State::Starting)
     }
 
     fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
         println!("Null state on event : {:?}", event);
-        nefsm::Response::Transition(State::Ready)
+        nefsm::Response::Transition(State::Starting)
     }
 
     fn on_exit(&mut self, context: &mut Context) {
@@ -71,7 +71,10 @@ impl nefsm::Stateful<State, Context, Event> for Starting {
 
     fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
         println!("Starting state on event : {:?}", event);
-        nefsm::Response::Handled
+        match event {
+            Event::Started => nefsm::Response::Transition(State::Ready),
+            _ => nefsm::Response::Handled
+        }
     }
 
     fn on_exit(&mut self, context: &mut Context) {
@@ -87,7 +90,10 @@ impl nefsm::Stateful<State, Context, Event> for Ready {
 
     fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
         println!("Ready state on event : {:?}", event);
-        nefsm::Response::Handled
+        match event{            
+            Event::Disconnected => nefsm::Response::Transition(State::Null),
+            _ => nefsm::Response::Handled
+        }
     }
 
     fn on_exit(&mut self, context: &mut Context) {
@@ -102,8 +108,16 @@ pub struct Context {
 
 fn main() {
     let mut state_machine = 
-        nefsm::StateMachine::<State, Context, Event>::new (State::Null, Context {retries : 0}, true);
-    state_machine.add_state(State::Null, Box::new(Null{}));
-    state_machine.process_event(&Event::Started);
+        nefsm::StateMachine::<State, Context, Event>::new (Context {retries : 0});
+    
+    state_machine.init(State::Null);
+
+    let events =[Event::Started, Event::Disconnected, Event::Started];
+
+    for e in events.into_iter() {
+        if let Err(e) = state_machine.process_event(&e) {
+            println!("state machine error : {:?}", e);
+        }    
+    }
     println!("Hello world");   
 }
