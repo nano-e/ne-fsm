@@ -1,9 +1,8 @@
-use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::{collections::HashMap, hash::Hash};
 
 pub trait FsmEnum<S, CTX, E> {
-    fn create(enum_value: &S) -> Box<dyn Stateful<S, CTX, E>>;
+    fn create(enum_value: &S) -> Box<dyn Stateful<S, CTX, E> + Send>;
 }
 
 pub trait Stateful<S: Hash + PartialEq + Eq + Clone, CTX, E: Debug> {
@@ -22,23 +21,23 @@ pub enum Error {
     StateMachineNotInitialized,
 }
 pub struct StateMachine<
-    S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E> + ToString,
+    S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>,
     CTX,
     E: Debug,
 > {
-    states: HashMap<S, Box<dyn Stateful<S, CTX, E>>>,
+    states: HashMap<S, Box<dyn Stateful<S, CTX, E> + Send>>,
     current_state: Option<S>,
     context: CTX,
 }
-impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E> + ToString, CTX, E: Debug>
+impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug>
     StateMachine<S, CTX, E>
 where
-    S: Debug,
+    S: Debug + Send,
     CTX: Sized,
     E: Sized,
 {
     pub fn new(context: CTX) -> Self {
-        let mut states = HashMap::<S, Box<dyn Stateful<S, CTX, E>>>::new();
+        let mut states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
         Self {
             states: states,
             current_state: None,
@@ -46,6 +45,9 @@ where
         }
     }
 
+    pub fn get_current_state(&self) -> Option<&S> {
+        self.current_state.as_ref()
+    }
     pub fn init(&mut self, initial_state: S) -> Result<(), Error> {
         if self.current_state.is_none() {
             self.current_state = Some(initial_state.clone());

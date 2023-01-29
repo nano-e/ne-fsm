@@ -12,7 +12,7 @@ use nefsm::Stateful;
 pub enum State {
     Null,
     Starting,
-    Ready,    
+    Ready,        
 }
 
 // impl FsmEnum<State, Context, Event> for State{
@@ -49,7 +49,7 @@ impl ToString for Event {
 
 impl nefsm::Stateful<State, Context, Event> for Null {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
-        println!("Null state on enter");
+        println!("Null state on enter, retries = {}", context.retries);
         nefsm::Response::Transition(State::Starting)
     }
 
@@ -66,6 +66,7 @@ impl nefsm::Stateful<State, Context, Event> for Null {
 impl nefsm::Stateful<State, Context, Event> for Starting {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
         println!("Starting state on enter");
+        context.retries = context.retries + 1;
         nefsm::Response::Handled
     }
 
@@ -112,12 +113,11 @@ fn main() {
     
     state_machine.init(State::Null);
 
-    let events =[Event::Started, Event::Disconnected, Event::Started];
+    let events =[Event::Started, Event::Disconnected, Event::Started, Event::Disconnected];
 
     for e in events.into_iter() {
         if let Err(e) = state_machine.process_event(&e) {
             println!("state machine error : {:?}", e);
         }    
-    }
-    println!("Hello world");   
+    }    
 }

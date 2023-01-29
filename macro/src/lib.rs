@@ -56,7 +56,7 @@ pub fn fsm_trait (attribute: proc_macro::TokenStream, input: proc_macro::TokenSt
     for v in &parsed.variants{
         quote!(
             #ident::#v =>  {
-                let result: Box<dyn Stateful<State, Context, Event>> = Box::new(#v{});
+                let result: Box<dyn Stateful<State, Context, Event> + Send> = Box::new(#v{});
                 return result;
             }
         ).to_tokens(&mut fn_create_body);     
@@ -64,7 +64,7 @@ pub fn fsm_trait (attribute: proc_macro::TokenStream, input: proc_macro::TokenSt
 
 
     quote!(impl FsmEnum<#attribute_2> for #ident{
-        fn create(enum_value: &#ident) ->Box<dyn Stateful<#attribute_2>> {
+        fn create(enum_value: &#ident) ->Box<dyn Stateful<#attribute_2> + Send> {
             match enum_value {
                 #fn_create_body
             }            
