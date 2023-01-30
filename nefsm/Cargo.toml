@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 syn = {version="1.0.107",features=["full","fold"]}
-quote = "1.0.23"
+quote = "^1.0"
 
 
 [dev-dependencies]
