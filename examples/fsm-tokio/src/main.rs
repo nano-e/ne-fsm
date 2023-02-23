@@ -11,22 +11,32 @@ use tokio::{sync::{oneshot, mpsc}, time, task};
 use nefsm::{FsmEnum, Stateful, StateMachine};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-#[fsm_trait(State, Context, Event)]
+#[fsm_trait(State, Context, Event<'a>)]
 pub enum State {
     StateA,
     StateB,
     StateC,        
 }
 
-#[derive(Debug, EnumCountMacro, EnumIter)]
-pub enum Event {
+#[derive(Debug)]
+pub struct Payload {
+    f1: u16
+}
+
+#[derive(Debug)]
+pub enum Event<'a> {
     E1,
-    E2,
+    E2(&'a Payload),
     E3,
     E4,
 }
 
-impl Stateful<State, Context, Event> for StateA {
+// struct StateA {}
+// struct StateB {}
+
+// struct StateC{}
+
+impl <'a>Stateful<State, Context, Event<'a>> for StateA {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {        
         context.retries = context.retries + 1;
         nefsm::Response::Handled
@@ -43,7 +53,7 @@ impl Stateful<State, Context, Event> for StateA {
         
     }
 }
-impl Stateful<State, Context, Event> for StateB {
+impl <'a>Stateful<State, Context, Event<'a>> for StateB {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
         context.retries = context.retries - 1;
         nefsm::Response::Handled
@@ -60,7 +70,7 @@ impl Stateful<State, Context, Event> for StateB {
         
     }
 }
-impl Stateful<State, Context, Event> for StateC {
+impl <'a>Stateful<State, Context, Event<'a>> for StateC {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
         context.retries = context.retries + 2;
         nefsm::Response::Handled
@@ -90,14 +100,15 @@ pub struct Context {
 //     }
 // }
 
-impl Distribution<Event> for Standard {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Event {    
-        let r = rng.gen_range(0..Event::COUNT);
-        println!("Sending event number : {}", r);    
-        Event::iter().nth(r).unwrap()        
-    }
-}
-
+// impl <'a>FsmEnum<State, Context, Event<'a>> for State {
+//     fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event<'a>> + Send> {
+//         match enum_value {
+//             State::StateA => Box::new(StateA{}),
+//             State::StateB => Box::new(StateB{}),
+//             State::StateC => Box::new(StateC{})
+//         }
+//     }
+// }
 
 #[tokio::main]
 async fn main() {
@@ -107,7 +118,7 @@ async fn main() {
         let tx2 = tx.clone();
         loop {
             interval.tick().await;
-            let event:Event = rand::random();
+            let event:Event = Event::E1;
             match tx2.send(event).await {
                 Ok(_) => {},
                 Err(e) => {

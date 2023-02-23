@@ -9,7 +9,7 @@ edition = "2021"
 nefsm = { path = "../../nefsm" }
 nefsm_macro = { path = "../../macro" }
 
-tokio = { version = "1.24.2", features = ["full"] }
-rand = "0.8.5"
-strum = "0.24.1"
-strum_macros = "0.24.3"
+tokio = { version = "^1.24", features = ["full"] }
+rand = "^0.8"
+strum = "^0.24"
+strum_macros = "^0.24"
