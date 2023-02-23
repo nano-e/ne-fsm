@@ -4,14 +4,11 @@ use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
 
-
-use nefsm_macro::fsm_trait;
 use rand::{prelude::Distribution, distributions::Standard, Rng};
 use tokio::{sync::{oneshot, mpsc}, time, task};
 use nefsm::{FsmEnum, Stateful, StateMachine};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-#[fsm_trait(State, Context, Event<'a>)]
 pub enum State {
     StateA,
     StateB,
@@ -31,10 +28,20 @@ pub enum Event<'a> {
     E4,
 }
 
-// struct StateA {}
-// struct StateB {}
+struct StateA {}
+struct StateB {}
 
-// struct StateC{}
+struct StateC{}
+
+impl <'a> FsmEnum<State, Context, Event<'a>> for State {
+    fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event<'a>> + Send> {
+        match enum_value {
+            State::StateA => Box::new(StateA {}),
+            State::StateB => Box::new(StateB {}),
+            State::StateC => Box::new(StateC {}),
+        }
+    }
+}
 
 impl <'a>Stateful<State, Context, Event<'a>> for StateA {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {        

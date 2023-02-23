@@ -1,19 +1,41 @@
 
 
 use nefsm;
-use nefsm_macro::{ToStruct, fsm_trait};
+
 use nefsm::FsmEnum;
 use nefsm::Stateful;
 
 
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-#[fsm_trait(State, Context, Event)]
 pub enum State {
     Null,
     Starting,
     Ready,        
 }
+
+impl FsmEnum<State, Context, Event> for State {
+    fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event> + Send> {
+        match enum_value {
+            State::Null => Box::new(Null {}),
+            State::Starting => Box::new(Starting{}),
+            State::Ready => Box::new(Ready {}),
+        }
+    }
+}
+
+pub struct Null {
+
+}
+pub struct Starting {
+
+}
+
+pub struct Ready {
+
+}
+
+
 
 // impl FsmEnum<State, Context, Event> for State{
 //     fn create<'a>(enum_value: &'a State) -> &'a mut Box<dyn Stateful<State, Context, Event>> {
