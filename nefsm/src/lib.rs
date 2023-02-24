@@ -19,6 +19,7 @@
 //! This library is designed to be easy to use and flexible enough to handle a wide variety of
 //! state machine designs.
 //!
+//! 
 
 use std::fmt::Debug;
 use std::{collections::HashMap, hash::Hash};
