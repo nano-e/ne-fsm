@@ -70,7 +70,7 @@ where
 {
     // Define a constructor for the StateMachine struct
     pub fn new(context: CTX) -> Self {
-        let mut states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
+        let states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
         Self {
             states: states,
             current_state: None,
