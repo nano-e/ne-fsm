@@ -1,12 +1,10 @@
 
 use std::{time::Duration};
-use strum::{EnumCount, IntoEnumIterator};
-use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
 
-use rand::{prelude::Distribution, distributions::Standard, Rng};
-use tokio::{sync::{oneshot, mpsc}, time, task};
-use nefsm::{FsmEnum, Stateful, StateMachine};
+use rand::Rng;
+use tokio::{sync::mpsc, time, task};
+use nefsm::{FsmEnum, Stateful};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum State {
@@ -113,13 +111,6 @@ impl <'a>Stateful<State, Context, Event> for StateC {
 pub struct Context {
     retries: u32
 }
-// impl Event {
-//     pub fn random() -> Event {
-
-        
-//         Event::E1
-//     }
-// }
 
 #[tokio::main]
 async fn main() {
@@ -150,7 +141,7 @@ async fn main() {
         state_machine.init(State::StateA);
 
         while let Some(message) = rx.recv().await {            
-             println!("current state {:?} - event {:?}", state_machine.get_current_state(), message);
+             println!("current state: {:?} - even:t {:?} - context: {:?}", state_machine.get_current_state(), message, state_machine.get_context());
              state_machine.process_event(&message);
         }
     });
