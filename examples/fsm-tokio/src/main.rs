@@ -21,20 +21,34 @@ pub struct Payload {
 }
 
 #[derive(Debug)]
-pub enum Event<'a> {
+pub enum Event<> {
     E1,
-    E2(&'a Payload),
+    E2(Payload),
     E3,
     E4,
 }
+
+impl Event {
+    pub fn random() -> Event {
+        let mut rng = rand::thread_rng();
+        match rng.gen_range(0..4) {
+            0 => Event::E1,
+            1 => Event::E2(Payload { f1: rng.gen_range(0..100) }),
+            2 => Event::E3,
+            3 => Event::E4,
+            _ => panic!("Invalid event"),
+        }
+    }
+}
+
 
 struct StateA {}
 struct StateB {}
 
 struct StateC{}
 
-impl <'a> FsmEnum<State, Context, Event<'a>> for State {
-    fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event<'a>> + Send> {
+impl <'a> FsmEnum<State, Context, Event> for State {
+    fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event> + Send> {
         match enum_value {
             State::StateA => Box::new(StateA {}),
             State::StateB => Box::new(StateB {}),
@@ -43,7 +57,7 @@ impl <'a> FsmEnum<State, Context, Event<'a>> for State {
     }
 }
 
-impl <'a>Stateful<State, Context, Event<'a>> for StateA {
+impl <'a>Stateful<State, Context, Event> for StateA {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {        
         context.retries = context.retries + 1;
         nefsm::Response::Handled
@@ -60,7 +74,7 @@ impl <'a>Stateful<State, Context, Event<'a>> for StateA {
         
     }
 }
-impl <'a>Stateful<State, Context, Event<'a>> for StateB {
+impl Stateful<State, Context, Event> for StateB {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
         context.retries = context.retries - 1;
         nefsm::Response::Handled
@@ -77,7 +91,7 @@ impl <'a>Stateful<State, Context, Event<'a>> for StateB {
         
     }
 }
-impl <'a>Stateful<State, Context, Event<'a>> for StateC {
+impl <'a>Stateful<State, Context, Event> for StateC {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
         context.retries = context.retries + 2;
         nefsm::Response::Handled
@@ -107,16 +121,6 @@ pub struct Context {
 //     }
 // }
 
-// impl <'a>FsmEnum<State, Context, Event<'a>> for State {
-//     fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event<'a>> + Send> {
-//         match enum_value {
-//             State::StateA => Box::new(StateA{}),
-//             State::StateB => Box::new(StateB{}),
-//             State::StateC => Box::new(StateC{})
-//         }
-//     }
-// }
-
 #[tokio::main]
 async fn main() {
     let (tx, mut rx) = mpsc::channel::<Event>(10);
@@ -125,7 +129,7 @@ async fn main() {
         let tx2 = tx.clone();
         loop {
             interval.tick().await;
-            let event:Event = Event::E1;
+            let event:Event = Event::random();
             match tx2.send(event).await {
                 Ok(_) => {},
                 Err(e) => {
