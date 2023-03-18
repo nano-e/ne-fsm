@@ -2,8 +2,8 @@
 
 use nefsm;
 
-use nefsm::FsmEnum;
-use nefsm::Stateful;
+use nefsm::sync::FsmEnum;
+use nefsm::sync::Stateful;
 
 
 
@@ -45,7 +45,7 @@ pub struct Ready {
 
 // impl FsmEnum<State, Context, Event> for State {
 
-//     fn create(&self) -> Option<&mut Box<dyn nefsm::Stateful<S, CTX, E>>> {
+//     fn create(&self) -> Option<&mut Box<dyn nefsm::sync::Stateful<S, CTX, E>>> {
 //         todo!()
 //     }
 // }
@@ -69,15 +69,15 @@ impl ToString for Event {
 
 
 
-impl nefsm::Stateful<State, Context, Event> for Null {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
+impl nefsm::sync::Stateful<State, Context, Event> for Null {
+    fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Null state on enter, retries = {}", context.retries);
-        nefsm::Response::Transition(State::Starting)
+        nefsm::sync::Response::Transition(State::Starting)
     }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Null state on event : {:?}", event);
-        nefsm::Response::Transition(State::Starting)
+        nefsm::sync::Response::Transition(State::Starting)
     }
 
     fn on_exit(&mut self, context: &mut Context) {
@@ -85,18 +85,18 @@ impl nefsm::Stateful<State, Context, Event> for Null {
     }
 }
 
-impl nefsm::Stateful<State, Context, Event> for Starting {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
+impl nefsm::sync::Stateful<State, Context, Event> for Starting {
+    fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Starting state on enter");
         context.retries = context.retries + 1;
-        nefsm::Response::Handled
+        nefsm::sync::Response::Handled
     }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Starting state on event : {:?}", event);
         match event {
-            Event::Started => nefsm::Response::Transition(State::Ready),
-            _ => nefsm::Response::Handled
+            Event::Started => nefsm::sync::Response::Transition(State::Ready),
+            _ => nefsm::sync::Response::Handled
         }
     }
 
@@ -105,17 +105,17 @@ impl nefsm::Stateful<State, Context, Event> for Starting {
     }
 }
 
-impl nefsm::Stateful<State, Context, Event> for Ready {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
+impl nefsm::sync::Stateful<State, Context, Event> for Ready {
+    fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Ready state on enter");
-        nefsm::Response::Handled
+        nefsm::sync::Response::Handled
     }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Ready state on event : {:?}", event);
         match event{            
-            Event::Disconnected => nefsm::Response::Transition(State::Null),
-            _ => nefsm::Response::Handled
+            Event::Disconnected => nefsm::sync::Response::Transition(State::Null),
+            _ => nefsm::sync::Response::Handled
         }
     }
 
@@ -131,7 +131,7 @@ pub struct Context {
 
 fn main() {
     let mut state_machine = 
-        nefsm::StateMachine::<State, Context, Event>::new (Context {retries : 0});
+        nefsm::sync::StateMachine::<State, Context, Event>::new (Context {retries : 0});
     
     state_machine.init(State::Null);
 

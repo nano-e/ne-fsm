@@ -4,7 +4,7 @@ use std::{time::Duration};
 
 use rand::Rng;
 use tokio::{sync::mpsc, time, task};
-use nefsm::{FsmEnum, Stateful};
+use nefsm::sync::{FsmEnum, Stateful};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum State {
@@ -56,15 +56,15 @@ impl <'a> FsmEnum<State, Context, Event> for State {
 }
 
 impl <'a>Stateful<State, Context, Event> for StateA {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {        
+    fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {        
         context.retries = context.retries + 1;
-        nefsm::Response::Handled
+        nefsm::sync::Response::Handled
     }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         match event{
-            Event::E1 => nefsm::Response::Transition(State::StateB),
-            _ => nefsm::Response::Transition(State::StateC),
+            Event::E1 => nefsm::sync::Response::Transition(State::StateB),
+            _ => nefsm::sync::Response::Transition(State::StateC),
         }
     }
 
@@ -73,15 +73,15 @@ impl <'a>Stateful<State, Context, Event> for StateA {
     }
 }
 impl Stateful<State, Context, Event> for StateB {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
+    fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {
         context.retries = context.retries - 1;
-        nefsm::Response::Handled
+        nefsm::sync::Response::Handled
     }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         match event{
-            Event::E1 => nefsm::Response::Transition(State::StateC),
-            _ => nefsm::Response::Transition(State::StateA),
+            Event::E1 => nefsm::sync::Response::Transition(State::StateC),
+            _ => nefsm::sync::Response::Transition(State::StateA),
         }
     }
 
@@ -90,15 +90,15 @@ impl Stateful<State, Context, Event> for StateB {
     }
 }
 impl <'a>Stateful<State, Context, Event> for StateC {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
+    fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {
         context.retries = context.retries + 2;
-        nefsm::Response::Handled
+        nefsm::sync::Response::Handled
     }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         match event{
-            Event::E1 => nefsm::Response::Transition(State::StateA),
-            _ => nefsm::Response::Transition(State::StateB),
+            Event::E1 => nefsm::sync::Response::Transition(State::StateA),
+            _ => nefsm::sync::Response::Transition(State::StateB),
         }
     }
 
@@ -134,7 +134,7 @@ async fn main() {
     //     println!("GOT = {}", message.to_string());
     // }
     let mut state_machine = 
-    nefsm::StateMachine::<State, Context, Event>::new (Context {retries : 0});
+    nefsm::sync::StateMachine::<State, Context, Event>::new (Context {retries : 0});
 
     let consumer = task::spawn(async move{
        

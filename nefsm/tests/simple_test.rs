@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use nefsm::{*};
+    use nefsm::sync::{*};
 
     #[derive(Debug, Hash, PartialEq, Eq, Clone)]
     enum TestState {
