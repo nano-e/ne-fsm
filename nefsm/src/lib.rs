@@ -150,6 +150,7 @@ pub mod Async {
     use std::{collections::HashMap, hash::Hash};
 
     use async_trait::async_trait;
+    use tracing::{instrument, event, Level, trace};
 
     // Define the FsmEnum trait, which is used to create new state objects
     pub trait FsmEnum<S, CTX, E> {
@@ -212,6 +213,7 @@ pub mod Async {
 
         // Define a method to initialize the state machine with an initial state
         // Note how the state objects are cached in a HashMap and not recreated every time we transition to this event.
+        #[instrument]
         pub async fn init(&mut self, initial_state: S) -> Result<(), Error> {
             if self.current_state.is_none() {
                 self.current_state = Some(initial_state.clone());
@@ -219,8 +221,7 @@ pub mod Async {
                     let state = self
                         .states
                         .entry(self.current_state.clone().unwrap())
-                        .or_insert_with(|| S::create(&self.current_state.clone().unwrap()));
-
+                        .or_insert_with(|| S::create(&self.current_state.clone().unwrap()));                    
                     match state.on_enter(&mut self.context).await {
                         Response::Handled => break,
                         Response::Transition(s) => self.current_state = Some(s),
@@ -231,16 +232,16 @@ pub mod Async {
         }
 
         // Define a method to process events and transition between states
+        #[instrument]
         pub async fn process_event(&mut self, event: &E) -> Result<(), Error> {
             let c_state = match self.current_state.clone() {
                 Some(state) => state,
                 None => return Err(Error::StateMachineNotInitialized),
             };
-
             let state = self
                 .states
                 .entry(c_state.clone())
-                .or_insert_with(|| S::create(&c_state));
+                .or_insert_with(|| S::create(&c_state));            
             match state.on_event(event, &mut self.context).await {
                 Response::Handled => {}
                 Response::Transition(new_state) => {
@@ -270,6 +271,18 @@ pub mod Async {
             }
 
             Ok(())
+        }
+    }
+    impl<S, CTX, E> Debug for StateMachine<S, CTX, E>
+    where
+        S: Debug + Send + Hash + Clone + Eq + FsmEnum<S, CTX, E>,
+        CTX: Sized,
+        E: Sized + Debug,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("StateMachine")
+                .field("current_state", &self.current_state)
+                .finish()
         }
     }
 }
