@@ -117,7 +117,7 @@ pub mod sync {
                 Response::Handled => {}
                 Response::Transition(new_state) => {
                     if new_state != c_state {
-                        state.on_exit(&mut &mut self.context);
+                        state.on_exit(&mut self.context);
                         self.current_state = Some(new_state.clone());
                         loop {
                             let s = self
@@ -246,7 +246,7 @@ pub mod Async {
                 Response::Handled => {}
                 Response::Transition(new_state) => {
                     if new_state != c_state {
-                        state.on_exit(&mut &mut self.context).await;
+                        state.on_exit(&mut self.context).await;
                         self.current_state = Some(new_state.clone());
                         loop {
                             let s = self
