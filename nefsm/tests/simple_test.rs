@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_state_machine() {
-        let mut sm = StateMachine::new(());
+        let mut sm = StateMachine::new((), None);
         sm.init(TestState::State1).unwrap();
         assert_eq!(*sm.get_current_state().unwrap(), TestState::State1);
         sm.process_event(&TestEvent::Event1).unwrap();

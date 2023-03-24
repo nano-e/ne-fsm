@@ -2,8 +2,11 @@
 
 use nefsm;
 
+use nefsm::sync::EventHandler;
 use nefsm::sync::FsmEnum;
+use nefsm::sync::Response;
 use nefsm::sync::Stateful;
+use rand::Rng;
 
 
 
@@ -35,6 +38,27 @@ pub struct Ready {
 
 }
 
+
+pub struct GlobalStateTransitionHandler;
+
+impl EventHandler<State, Context, Event> for GlobalStateTransitionHandler {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> Response<State> {
+        match event {
+            Event::Started => {
+                println!("Global state transition handler: Started event received");
+                let mut rng = rand::thread_rng();
+                let next_state = match rng.gen_range(0..3) {
+                    0 => State::Null,
+                    1 => State::Starting,
+                    2 => State::Ready,
+                    _ => panic!("Unexpected random value"),
+                };
+                Response::Transition(next_state)
+            }
+            _ => Response::Handled,
+        }
+    }
+}
 
 
 // impl FsmEnum<State, Context, Event> for State{
@@ -131,7 +155,7 @@ pub struct Context {
 
 fn main() {
     let mut state_machine = 
-        nefsm::sync::StateMachine::<State, Context, Event>::new (Context {retries : 0});
+        nefsm::sync::StateMachine::<State, Context, Event>::new (Context {retries : 0}, Some(Box::new(GlobalStateTransitionHandler{})));
     
     state_machine.init(State::Null);
 

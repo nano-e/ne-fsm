@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 nefsm = { path = "../../nefsm" }
-
+async-trait = "0.1"
 tokio = { version = "^1.24", features = ["full"] }
 rand = "^0.8"
 strum = "^0.24"
