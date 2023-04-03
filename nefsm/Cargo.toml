@@ -1,6 +1,6 @@
 [package]
 name = "nefsm"
-version = "0.1.0"
+version = "0.1.2"
 description = "A simple state machine library for Rust."
 license = "MIT"
 repository = "https://github.com/nano-e/ne-fsm"
@@ -13,6 +13,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
+async-trait = "0.1"
+tracing = "0.1"
 
 [dev-dependencies]

@@ -1,29 +1,95 @@
+use std::time::Duration;
 
-use std::{time::Duration};
-
-
+use async_trait::async_trait;
 use rand::Rng;
 use tokio::{sync::mpsc, time, task};
-use nefsm::{FsmEnum, Stateful};
+use nefsm::Async::{FsmEnum, Stateful, StateMachine, EventHandler, Response};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum State {
     StateA,
     StateB,
-    StateC,        
+    StateC,
 }
 
 #[derive(Debug)]
 pub struct Payload {
-    f1: u16
+    f1: u16,
 }
 
 #[derive(Debug)]
-pub enum Event<> {
+pub enum Event {
     E1,
     E2(Payload),
     E3,
     E4,
+}
+
+struct StateA {
+
+}
+struct StateB {
+    
+}
+
+struct StateC {
+    
+}
+#[async_trait]
+impl Stateful<State, Context, Event> for StateA {
+    async fn on_enter(&mut self, context: &mut Context) -> Response<State> {
+        context.retries = context.retries + 1;
+        Response::Handled
+    }
+
+    async fn on_event(&mut self, event: &Event, context: &mut Context) -> Response<State> {
+        match event {
+            Event::E1 => Response::Transition(State::StateB),
+            _ => Response::Transition(State::StateC),
+        }
+    }
+
+    async fn on_exit(&mut self, _context: &mut Context) {
+        // Add any necessary code for when the state is exited
+    }
+}
+
+#[async_trait]
+impl Stateful<State, Context, Event> for StateB {
+    async fn on_enter(&mut self, context: &mut Context) -> Response<State> {
+        context.retries = context.retries - 1;
+        Response::Handled
+    }
+
+    async fn on_event(&mut self, event: &Event, context: &mut Context) -> Response<State> {
+        match event {
+            Event::E1 => Response::Transition(State::StateC),
+            _ => Response::Transition(State::StateA),
+        }
+    }
+
+    async fn on_exit(&mut self, _context: &mut Context) {
+        // Add any necessary code for when the state is exited
+    }
+}
+
+#[async_trait]
+impl Stateful<State, Context, Event> for StateC {
+    async fn on_enter(&mut self, context: &mut Context) -> Response<State> {
+        context.retries = context.retries + 2;
+        Response::Handled
+    }
+
+    async fn on_event(&mut self, event: &Event, context: &mut Context) -> Response<State> {
+        match event {
+            Event::E1 => Response::Transition(State::StateA),
+            _ => Response::Transition(State::StateB),
+        }
+    }
+
+    async fn on_exit(&mut self, _context: &mut Context) {
+        // Add any necessary code for when the state is exited
+    }
 }
 
 impl Event {
@@ -39,13 +105,48 @@ impl Event {
     }
 }
 
+struct GlobalEventHandler;
 
-struct StateA {}
-struct StateB {}
 
-struct StateC{}
 
-impl <'a> FsmEnum<State, Context, Event> for State {
+
+#[async_trait]
+impl EventHandler<State, Context, Event> for GlobalEventHandler {
+    async fn on_event(&mut self, event: &Event, context: &mut Context) -> Response<State> {
+        match event {
+            Event::E4 => {
+                println!("Global event handler: E4 received");
+                Response::Handled
+            }
+            _ => random_transition(),
+        }
+    }
+}
+
+fn random_transition() -> Response<State> {
+    let mut rng = rand::thread_rng();
+    let random_value: f64 = rng.gen();
+
+    if random_value < 0.5 {
+        Response::Handled
+    } else {
+        let next_state = match rng.gen_range(0..3) {
+            0 => State::StateA,
+            1 => State::StateB,
+            2 => State::StateC,
+            _ => panic!("Invalid state"),
+        };
+
+        Response::Transition(next_state)
+    }
+}
+
+#[derive(Debug)]
+pub struct Context {
+    retries: u32,
+}
+
+impl FsmEnum<State, Context, Event> for State {
     fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event> + Send> {
         match enum_value {
             State::StateA => Box::new(StateA {}),
@@ -55,62 +156,8 @@ impl <'a> FsmEnum<State, Context, Event> for State {
     }
 }
 
-impl <'a>Stateful<State, Context, Event> for StateA {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {        
-        context.retries = context.retries + 1;
-        nefsm::Response::Handled
-    }
 
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
-        match event{
-            Event::E1 => nefsm::Response::Transition(State::StateB),
-            _ => nefsm::Response::Transition(State::StateC),
-        }
-    }
-
-    fn on_exit(&mut self, context: &mut Context) {
-        
-    }
-}
-impl Stateful<State, Context, Event> for StateB {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
-        context.retries = context.retries - 1;
-        nefsm::Response::Handled
-    }
-
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
-        match event{
-            Event::E1 => nefsm::Response::Transition(State::StateC),
-            _ => nefsm::Response::Transition(State::StateA),
-        }
-    }
-
-    fn on_exit(&mut self, context: &mut Context) {
-        
-    }
-}
-impl <'a>Stateful<State, Context, Event> for StateC {
-    fn on_enter(&mut self, context: &mut Context) -> nefsm::Response<State> {
-        context.retries = context.retries + 2;
-        nefsm::Response::Handled
-    }
-
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::Response<State> {
-        match event{
-            Event::E1 => nefsm::Response::Transition(State::StateA),
-            _ => nefsm::Response::Transition(State::StateB),
-        }
-    }
-
-    fn on_exit(&mut self, context: &mut Context) {
-        
-    }
-}
-
-#[derive(Debug)]
-pub struct Context {
-    retries: u32
-}
+// Rest of the state and event handling code remains unchanged
 
 #[tokio::main]
 async fn main() {
@@ -120,9 +167,9 @@ async fn main() {
         let tx2 = tx.clone();
         loop {
             interval.tick().await;
-            let event:Event = Event::random();
+            let event: Event = Event::random();
             match tx2.send(event).await {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     println!("error sending event {}", e);
                 }
@@ -130,25 +177,21 @@ async fn main() {
         }
     });
 
-    // while let Some(message) = rx.recv().await {
-    //     println!("GOT = {}", message.to_string());
-    // }
-    let mut state_machine = 
-    nefsm::StateMachine::<State, Context, Event>::new (Context {retries : 0});
+    let mut state_machine = StateMachine::<State, Context, Event>::new(Context { retries: 0 }, Some(Box::new(GlobalEventHandler)));
+    state_machine.init(State::StateA).await;    
 
-    let consumer = task::spawn(async move{
-       
-        state_machine.init(State::StateA);
-
-        while let Some(message) = rx.recv().await {            
-             println!("current state: {:?} - even:t {:?} - context: {:?}", state_machine.get_current_state(), message, state_machine.get_context());
-             state_machine.process_event(&message);
+    let consumer = task::spawn(async move {
+        while let Some(message) = rx.recv().await {
+            println!(
+                "current state: {:?} - event: {:?} - context: {:?}",
+                state_machine.get_current_state(),
+                message,
+                state_machine.get_context()
+            );
+            state_machine.process_event(&message).await;
         }
     });
 
-
-
-    producer.await;
-    consumer.await;
-
+    producer.await.unwrap();
+    consumer.await.unwrap();
 }
