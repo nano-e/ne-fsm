@@ -4,6 +4,7 @@ members = [
     "nefsm",
     "examples/basic",
     "examples/fsm-tokio",
+    "examples/fsm-call-tokio",
 ]
 exclude = ["testing/wasm-tests"]
 

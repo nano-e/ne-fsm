@@ -1,0 +1,14 @@
+[package]
+name = "fsm-call-tokio"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nefsm = { path = "../../nefsm" }
+async-trait = "0.1"
+tokio = { version = "^1.24", features = ["full"] }
+rand = "^0.8"
+strum = "^0.24"
+strum_macros = "^0.24"
