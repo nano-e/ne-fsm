@@ -30,8 +30,7 @@ pub mod sync {
     }
 
     // Define the Stateful trait, which contains the event handling methods for each state
-    pub trait Stateful<S: Hash + PartialEq + Eq + Clone, CTX, E: Debug>
-    {
+    pub trait Stateful<S: Hash + PartialEq + Eq + Clone, CTX, E: Debug> {
         fn on_enter(&mut self, context: &mut CTX) -> Response<S>;
         fn on_event(&mut self, event: &E, context: &mut CTX) -> Response<S>;
         fn on_exit(&mut self, context: &mut CTX);
@@ -90,12 +89,17 @@ pub mod sync {
         // Note how the state objects are cached in a HashMap and not recreated every time we transition to this event.
         pub fn init(&mut self, initial_state: S) -> Result<(), Error> {
             if self.current_state.is_none() {
-                self.current_state = Some(initial_state.clone());
+                self.current_state = Some(initial_state);
                 loop {
-                    let state = self
-                        .states
-                        .entry(self.current_state.clone().unwrap())
-                        .or_insert_with(|| S::create(&self.current_state.clone().unwrap()));
+                    let current_state_ref = self.current_state.as_ref().unwrap();
+                    let state = if let Some(existing_state) = self.states.get_mut(current_state_ref)
+                    {
+                        existing_state
+                    } else {
+                        let new_state = S::create(current_state_ref);
+                        let current_state_clone = self.current_state.clone().unwrap();
+                        self.states.entry(current_state_clone).or_insert(new_state)
+                    };
 
                     match state.on_enter(&mut self.context) {
                         Response::Handled => break,
@@ -108,7 +112,7 @@ pub mod sync {
 
         // Define a method to process events and transition between states
         pub fn process_event(&mut self, event: &E) -> Result<(), Error> {
-            let c_state = match self.current_state.clone() {
+            let c_state = match &self.current_state {
                 Some(state) => state,
                 None => return Err(Error::StateMachineNotInitialized),
             };
@@ -117,21 +121,25 @@ pub mod sync {
                 match global_handler.on_event(event, &mut self.context) {
                     Response::Handled => {}
                     Response::Transition(new_state) => {
-                        if new_state != c_state {
+                        if new_state != *c_state {
                             return self.transition_to(new_state);
                         }
                     }
                 }
             }
 
-            let state = self
-                .states
-                .entry(c_state.clone())
-                .or_insert_with(|| S::create(&c_state));
+            let current_state_ref = self.current_state.as_ref().unwrap();
+            let state = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+                existing_state
+            } else {
+                let new_state = S::create(current_state_ref);
+                let current_state_clone = self.current_state.clone().unwrap();
+                self.states.entry(current_state_clone).or_insert(new_state)
+            };
             match state.on_event(event, &mut self.context) {
                 Response::Handled => {}
                 Response::Transition(new_state) => {
-                    if new_state != c_state {
+                    if new_state != *c_state {
                         self.transition_to(new_state)?;
                     }
                 }
@@ -142,22 +150,26 @@ pub mod sync {
 
         // Define a method to handle state transitions
         fn transition_to(&mut self, new_state: S) -> Result<(), Error> {
-            let c_state = self.current_state.clone().unwrap();
+            let c_state = self.current_state.as_ref().unwrap();
             let state = self.states.get_mut(&c_state).unwrap();
             state.on_exit(&mut self.context);
 
             self.current_state = Some(new_state.clone());
             loop {
-                let s = self
-                    .states
-                    .entry(self.current_state.clone().unwrap())
-                    .or_insert_with(|| S::create(&self.current_state.clone().unwrap()));
+                let current_state_ref = self.current_state.as_ref().unwrap();
+                let s = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+                    existing_state
+                } else {
+                    let new_state = S::create(current_state_ref);
+                    let current_state_clone = self.current_state.clone().unwrap();
+                    self.states.entry(current_state_clone).or_insert(new_state)
+                };
                 match s.on_enter(&mut self.context) {
                     Response::Handled => {
                         break;
                     }
                     Response::Transition(s) => {
-                        if s == self.current_state.clone().unwrap() {
+                        if s == *self.current_state.as_ref().unwrap() {
                             break;
                         } else {
                             self.current_state = Some(s);
@@ -219,7 +231,10 @@ pub mod Async {
     // Implement methods for the StateMachine struct
     impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> StateMachine<S, CTX, E> {
         // Define a constructor for the StateMachine struct
-        pub fn new(context: CTX, global_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>) -> Self {
+        pub fn new(
+            context: CTX,
+            global_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
+        ) -> Self {
             Self {
                 states: HashMap::new(),
                 current_state: None,
@@ -241,12 +256,17 @@ pub mod Async {
         // Define a method to initialize the state machine with an initial state
         pub async fn init(&mut self, initial_state: S) -> Result<(), Error> {
             if self.current_state.is_none() {
-                self.current_state = Some(initial_state.clone());
+                self.current_state = Some(initial_state);
                 loop {
-                    let state = self
-                        .states
-                        .entry(self.current_state.clone().unwrap())
-                        .or_insert_with(|| S::create(&self.current_state.clone().unwrap()));
+                    let current_state_ref = self.current_state.as_ref().unwrap();
+                    let state = if let Some(existing_state) = self.states.get_mut(current_state_ref)
+                    {
+                        existing_state
+                    } else {
+                        let new_state = S::create(current_state_ref);
+                        let current_state_clone = self.current_state.clone().unwrap();
+                        self.states.entry(current_state_clone).or_insert(new_state)
+                    };
 
                     match state.on_enter(&mut self.context).await {
                         Response::Handled => break,
@@ -258,7 +278,7 @@ pub mod Async {
         }
         // Define a method to process events and transition between states
         pub async fn process_event(&mut self, event: &E) -> Result<(), Error> {
-            let c_state = match self.current_state.clone() {
+            let c_state = match &self.current_state {
                 Some(state) => state,
                 None => return Err(Error::StateMachineNotInitialized),
             };
@@ -267,7 +287,7 @@ pub mod Async {
                 match handler.on_event(event, &mut self.context).await {
                     Response::Handled => {}
                     Response::Transition(new_state) => {
-                        if new_state != c_state {
+                        if new_state != *c_state {
                             self.transition_to(new_state).await;
                             return Ok(());
                         }
@@ -275,15 +295,19 @@ pub mod Async {
                 }
             }
 
-            let state = self
-                .states
-                .entry(c_state.clone())
-                .or_insert_with(|| S::create(&c_state));
+            let current_state_ref = self.current_state.as_ref().unwrap();
+            let state = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+                existing_state
+            } else {
+                let new_state = S::create(current_state_ref);
+                let current_state_clone = self.current_state.clone().unwrap();
+                self.states.entry(current_state_clone).or_insert(new_state)
+            };
 
             match state.on_event(event, &mut self.context).await {
                 Response::Handled => {}
                 Response::Transition(new_state) => {
-                    if new_state != c_state {
+                    if new_state != *c_state {
                         self.transition_to(new_state).await;
                     }
                 }
@@ -293,24 +317,28 @@ pub mod Async {
         }
 
         async fn transition_to(&mut self, new_state: S) {
-            let c_state = self.current_state.clone().unwrap();
+            let c_state = self.current_state.as_ref().unwrap();
             let state = self.states.get_mut(&c_state).unwrap();
             state.on_exit(&mut self.context).await;
 
-            self.current_state = Some(new_state.clone());
+            self.current_state = Some(new_state);
 
             loop {
-                let s = self
-                    .states
-                    .entry(self.current_state.clone().unwrap())
-                    .or_insert_with(|| S::create(&self.current_state.clone().unwrap()));
+                let current_state_ref = self.current_state.as_ref().unwrap();
+                let s = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+                    existing_state
+                } else {
+                    let new_state = S::create(current_state_ref);
+                    let current_state_clone = self.current_state.clone().unwrap();
+                    self.states.entry(current_state_clone).or_insert(new_state)
+                };
 
                 match s.on_enter(&mut self.context).await {
                     Response::Handled => {
                         break;
                     }
                     Response::Transition(s) => {
-                        if s == self.current_state.clone().unwrap() {
+                        if s == *current_state_ref {
                             break;
                         } else {
                             self.current_state = Some(s);
