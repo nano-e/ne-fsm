@@ -177,8 +177,8 @@ async fn main() {
         }
     });
 
-    let mut state_machine = StateMachine::<State, Context, Event>::new(Context { retries: 0 }, Some(Box::new(GlobalEventHandler)));
-    state_machine.init(State::StateA).await;    
+    let mut state_machine = StateMachine::<State, Context, Event>::new(State::StateA, Context { retries: 0 }, Some(Box::new(GlobalEventHandler)));
+    state_machine.init().await;    
 
     let consumer = task::spawn(async move {
         while let Some(message) = rx.recv().await {

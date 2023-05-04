@@ -18,12 +18,19 @@
 //! This library is designed to be easy to use and flexible enough to handle a wide variety of
 //! state machine designs.
 //!
-//!
+
+    // Define the Error enum, which is used to handle errors
+    #[derive(Debug)]
+    pub enum Error {
+        StateNotFound(String),
+        StateMachineNotInitialized,
+    }
+
 
 pub mod sync {
     use std::fmt::Debug;
     use std::{collections::HashMap, hash::Hash};
-
+    
     // Define the FsmEnum trait, which is used to create new state objects
     pub trait FsmEnum<S, CTX, E> {
         fn create(enum_value: &S) -> Box<dyn Stateful<S, CTX, E> + Send>;
@@ -47,27 +54,23 @@ pub mod sync {
         Transition(S),
     }
 
-    // Define the Error enum, which is used to handle errors
-    #[derive(Debug)]
-    pub enum Error {
-        StateNotFound(String),
-        StateMachineNotInitialized,
-    }
+
 
     // Define the StateMachine struct, which represents the finite state machine
     pub struct StateMachine<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> {
+        initial_state: S,
         states: HashMap<S, Box<dyn Stateful<S, CTX, E> + Send>>,
         current_state: Option<S>,
         context: CTX,
         global_event_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
     }
-
     // Implement methods for the StateMachine struct
     impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> StateMachine<S, CTX, E> {
         // Define a constructor for the StateMachine struct
-        pub fn new(context: CTX, handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>) -> Self {
+        pub fn new(initial_state: S, context: CTX, handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>) -> Self {
             let states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
             Self {
+                initial_state,
                 states,
                 current_state: None,
                 context,
@@ -75,7 +78,6 @@ pub mod sync {
             }
         }
 
-        // Define a method to get the current state
         pub fn get_current_state(&self) -> Option<&S> {
             self.current_state.as_ref()
         }
@@ -87,9 +89,9 @@ pub mod sync {
 
         // Define a method to initialize the state machine with an initial state
         // Note how the state objects are cached in a HashMap and not recreated every time we transition to this event.
-        pub fn init(&mut self, initial_state: S) -> Result<(), Error> {
+        pub fn init(&mut self) -> Result<(), crate::Error> {
             if self.current_state.is_none() {
-                self.current_state = Some(initial_state);
+                self.current_state = Some(self.initial_state.clone());
                 loop {
                     let current_state_ref = self.current_state.as_ref().unwrap();
                     let state = if let Some(existing_state) = self.states.get_mut(current_state_ref)
@@ -111,10 +113,10 @@ pub mod sync {
         }
 
         // Define a method to process events and transition between states
-        pub fn process_event(&mut self, event: &E) -> Result<(), Error> {
+        pub fn process_event(&mut self, event: &E) -> Result<(), crate::Error> {
             let c_state = match &self.current_state {
                 Some(state) => state,
-                None => return Err(Error::StateMachineNotInitialized),
+                None => return Err(crate::Error::StateMachineNotInitialized),
             };
 
             if let Some(global_handler) = &mut self.global_event_handler {
@@ -147,9 +149,10 @@ pub mod sync {
 
             Ok(())
         }
+        
 
         // Define a method to handle state transitions
-        fn transition_to(&mut self, new_state: S) -> Result<(), Error> {
+        fn transition_to(&mut self, new_state: S) -> Result<(), crate::Error> {
             let c_state = self.current_state.as_ref().unwrap();
             let state = self.states.get_mut(&c_state).unwrap();
             state.on_exit(&mut self.context);
@@ -193,6 +196,14 @@ pub mod Async {
         fn create(enum_value: &S) -> Box<dyn Stateful<S, CTX, E> + Send>;
     }
 
+
+    // #[async_trait]
+    // pub trait StateMachineTrait : Send + Sync {
+    //     fn get_current_state(&self) -> Option<S>;
+    //     fn get_context(&self) -> &dyn ContextTrait;
+    //     async fn init(&mut self, initial_state: &dyn StateTrait) -> Result<(), crate::Error>;
+    //     async fn process_event(&mut self, event: &dyn EventTrait) -> Result<(), crate::Error>;
+    // }
     // Define the EventHandler trait for handling global events
     #[async_trait]
     pub trait EventHandler<S: Hash + PartialEq + Eq + Clone, CTX, E: Debug> {
@@ -213,15 +224,10 @@ pub mod Async {
         Transition(S),
     }
 
-    // Define the Error enum, which is used to handle errors
-    #[derive(Debug)]
-    pub enum Error {
-        StateNotFound(String),
-        StateMachineNotInitialized,
-    }
 
     // Define the StateMachine struct, which represents the finite state machine
     pub struct StateMachine<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> {
+        initial_state: S,
         states: HashMap<S, Box<dyn Stateful<S, CTX, E> + Send>>,
         current_state: Option<S>,
         context: CTX,
@@ -231,17 +237,17 @@ pub mod Async {
     // Implement methods for the StateMachine struct
     impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> StateMachine<S, CTX, E> {
         // Define a constructor for the StateMachine struct
-        pub fn new(
-            context: CTX,
-            global_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
-        ) -> Self {
-            Self {
-                states: HashMap::new(),
-                current_state: None,
-                context,
-                global_event_handler: global_handler,
-            }
-        }
+        // pub fn new(
+        //     context: CTX,
+        //     global_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
+        // ) -> Self {
+        //     Self {
+        //         states: HashMap::new(),
+        //         current_state: None,
+        //         context,
+        //         global_event_handler: global_handler,
+        //     }
+        // }
 
         // Define a method to get the current state
         pub fn get_current_state(&self) -> Option<&S> {
@@ -254,9 +260,9 @@ pub mod Async {
         }
 
         // Define a method to initialize the state machine with an initial state
-        pub async fn init(&mut self, initial_state: S) -> Result<(), Error> {
+        pub async fn init(&mut self) -> Result<(), crate::Error> {
             if self.current_state.is_none() {
-                self.current_state = Some(initial_state);
+                self.current_state = Some(self.initial_state.clone());
                 loop {
                     let current_state_ref = self.current_state.as_ref().unwrap();
                     let state = if let Some(existing_state) = self.states.get_mut(current_state_ref)
@@ -277,10 +283,10 @@ pub mod Async {
             Ok(())
         }
         // Define a method to process events and transition between states
-        pub async fn process_event(&mut self, event: &E) -> Result<(), Error> {
+        pub async fn process_event(&mut self, event: &E) -> Result<(), crate::Error> {
             let c_state = match &self.current_state {
                 Some(state) => state,
-                None => return Err(Error::StateMachineNotInitialized),
+                None => return Err(crate::Error::StateMachineNotInitialized),
             };
 
             if let Some(ref mut handler) = self.global_event_handler {
@@ -315,6 +321,25 @@ pub mod Async {
 
             Ok(())
         }
+    }
+    // Implement methods for the StateMachine struct
+    impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> StateMachine<S, CTX, E> {
+        // Define a constructor for the StateMachine struct
+        pub fn new(
+            inital_state: S,
+            context: CTX,
+            global_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
+        ) -> Self {
+            Self {
+                initial_state: inital_state,
+                states: HashMap::new(),
+                current_state: None,
+                context,
+                global_event_handler: global_handler,
+            }
+        }
+
+        
 
         async fn transition_to(&mut self, new_state: S) {
             let c_state = self.current_state.as_ref().unwrap();

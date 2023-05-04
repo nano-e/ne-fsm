@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use nefsm::sync::{*};
+    use nefsm::{sync::{*}};
 
     #[derive(Debug, Hash, PartialEq, Eq, Clone)]
     enum TestState {
@@ -59,8 +59,8 @@ mod tests {
 
     #[test]
     fn test_state_machine() {
-        let mut sm = StateMachine::new((), None);
-        sm.init(TestState::State1).unwrap();
+        let mut sm = StateMachine::new(TestState::State1, (), None);
+        sm.init().unwrap();
         assert_eq!(*sm.get_current_state().unwrap(), TestState::State1);
         sm.process_event(&TestEvent::Event1).unwrap();
         assert_eq!(*sm.get_current_state().unwrap(), TestState::State1);

@@ -1,4 +1,4 @@
-use nefsm::sync::{Error, FsmEnum, Response, StateMachine, Stateful};
+use nefsm::sync::{FsmEnum, Response, StateMachine, Stateful};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum TestState {
@@ -92,17 +92,18 @@ impl nefsm::sync::EventHandler<TestState, TestContext, TestEvent> for TestGlobal
 // Now, let's define the tests
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     // Test the state machine initialization
     #[test]
     fn test_state_machine_initialization() {
         let mut fsm = StateMachine::<TestState, TestContext, TestEvent>::new(
-            TestContext { transitions: 0 },
+            TestState::A, TestContext { transitions: 0 },
             None,
         );
         assert!(fsm.get_current_state().is_none());
-        fsm.init(TestState::A).unwrap();
+        fsm.init().unwrap();
         assert_eq!(fsm.get_current_state().unwrap(), &TestState::A);
         assert_eq!(fsm.get_context().transitions, 1);
     }
@@ -110,11 +111,11 @@ mod tests {
     // Test state machine transitions
     #[test]
     fn test_state_machine_transitions() {
-        let mut fsm = StateMachine::<TestState, TestContext, TestEvent>::new(
+        let mut fsm = StateMachine::<TestState, TestContext, TestEvent>::new(TestState::A,
             TestContext { transitions: 0 },
             None,
         );
-        fsm.init(TestState::A).unwrap();
+        fsm.init().unwrap();
         fsm.process_event(&TestEvent::TransitionToB).unwrap();
         assert_eq!(fsm.get_current_state().unwrap(), &TestState::B);
         assert_eq!(fsm.get_context().transitions, 2);
@@ -138,10 +139,10 @@ mod tests {
         let global_handler = Box::new(TestGlobalHandler { handled_count: 0 });
 
         let mut sm = StateMachine::<TestState, TestContext, TestEvent>::new(
-            context, Some(global_handler)
+            TestState::A, context, Some(global_handler)
         );
 
-        sm.init(TestState::A).unwrap();
+        sm.init().unwrap();
 
         // Trigger a global event
         sm.process_event(&TestEvent::IncrementByTwo).unwrap();

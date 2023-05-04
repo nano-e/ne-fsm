@@ -155,9 +155,9 @@ pub struct Context {
 
 fn main() {
     let mut state_machine = 
-        nefsm::sync::StateMachine::<State, Context, Event>::new (Context {retries : 0}, Some(Box::new(GlobalStateTransitionHandler{})));
+        nefsm::sync::StateMachine::<State, Context, Event>::new (State::Null, Context {retries : 0}, Some(Box::new(GlobalStateTransitionHandler{})));
     
-    state_machine.init(State::Null);
+    state_machine.init();
 
     let events =[Event::Started, Event::Disconnected, Event::Started, Event::Disconnected];
 
