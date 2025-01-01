@@ -44,6 +44,7 @@ pub mod sync {
     // Define the Response enum, which is used to handle state transitions
     pub enum Response<S> {
         Handled,
+        Error(String),
         Transition(S),
     }
 
@@ -51,6 +52,8 @@ pub mod sync {
     #[derive(Debug)]
     pub enum Error {
         StateNotFound(String),
+        StateInvalid(String),
+        InvalidEvent(String),
         StateMachineNotInitialized,
     }
 
@@ -103,6 +106,7 @@ pub mod sync {
 
                     match state.on_enter(&mut self.context) {
                         Response::Handled => break,
+                        Response::Error(e) => return Err(Error::StateInvalid(e)),
                         Response::Transition(s) => self.current_state = Some(s),
                     }
                 }
@@ -120,6 +124,7 @@ pub mod sync {
             if let Some(global_handler) = &mut self.global_event_handler {
                 match global_handler.on_event(event, &mut self.context) {
                     Response::Handled => {}
+                    Response::Error(s) => return Err(Error::InvalidEvent(s)),
                     Response::Transition(new_state) => {
                         if new_state != *c_state {
                             return self.transition_to(new_state);
@@ -137,15 +142,15 @@ pub mod sync {
                 self.states.entry(current_state_clone).or_insert(new_state)
             };
             match state.on_event(event, &mut self.context) {
-                Response::Handled => {}
+                Response::Handled => Ok(()),
+                Response::Error(s) => Err(Error::InvalidEvent(s)),
                 Response::Transition(new_state) => {
                     if new_state != *c_state {
                         self.transition_to(new_state)?;
                     }
+                    Ok(())
                 }
             }
-
-            Ok(())
         }
 
         // Define a method to handle state transitions
@@ -168,6 +173,7 @@ pub mod sync {
                     Response::Handled => {
                         break;
                     }
+                    Response::Error(e) => return Err(Error::InvalidEvent(e)),
                     Response::Transition(s) => {
                         if s == *self.current_state.as_ref().unwrap() {
                             break;
@@ -210,6 +216,7 @@ pub mod Async {
     // Define the Response enum, which is used to handle state transitions
     pub enum Response<S> {
         Handled,
+        Error(String),
         Transition(S),
     }
 
@@ -217,6 +224,8 @@ pub mod Async {
     #[derive(Debug)]
     pub enum Error {
         StateNotFound(String),
+        StateInvalid(String),
+        InvalidEvent(String),
         StateMachineNotInitialized,
     }
 
@@ -270,6 +279,7 @@ pub mod Async {
 
                     match state.on_enter(&mut self.context).await {
                         Response::Handled => break,
+                        Response::Error(e) => return Err(Error::StateInvalid(e)),
                         Response::Transition(s) => self.current_state = Some(s),
                     }
                 }
@@ -286,6 +296,7 @@ pub mod Async {
             if let Some(ref mut handler) = self.global_event_handler {
                 match handler.on_event(event, &mut self.context).await {
                     Response::Handled => {}
+                    Response::Error(s) => return Err(Error::InvalidEvent(s)),
                     Response::Transition(new_state) => {
                         if new_state != *c_state {
                             self.transition_to(new_state).await;
@@ -305,18 +316,18 @@ pub mod Async {
             };
 
             match state.on_event(event, &mut self.context).await {
-                Response::Handled => {}
+                Response::Handled => Ok(()),
+                Response::Error(s) => Err(Error::InvalidEvent(s)),
                 Response::Transition(new_state) => {
                     if new_state != *c_state {
-                        self.transition_to(new_state).await;
+                        return self.transition_to(new_state).await;
                     }
+                    Ok(())
                 }
             }
-
-            Ok(())
         }
 
-        async fn transition_to(&mut self, new_state: S) {
+        async fn transition_to(&mut self, new_state: S) -> Result<(), Error> {
             let c_state = self.current_state.as_ref().unwrap();
             let state = self.states.get_mut(&c_state).unwrap();
             state.on_exit(&mut self.context).await;
@@ -337,6 +348,7 @@ pub mod Async {
                     Response::Handled => {
                         break;
                     }
+                    Response::Error(e) => return Err(Error::InvalidEvent(e)),
                     Response::Transition(s) => {
                         if s == *current_state_ref {
                             break;
@@ -346,6 +358,8 @@ pub mod Async {
                     }
                 }
             }
+
+            Ok(())
         }
     }
 }
