@@ -141,11 +141,11 @@ pub struct Context {
 
 fn main() {
     let mut state_machine = nefsm::sync::StateMachine::<State, Context, Event>::new(
+        State::Null,
         Context { retries: 0 },
         Some(Box::new(GlobalStateTransitionHandler {})),
-    );
-
-    state_machine.init(State::Null);
+    )
+    .unwrap();
 
     let events = [
         Event::Started,

@@ -79,17 +79,17 @@ mod tests {
 
     #[test]
     fn test_state_machine() {
-        let mut sm = StateMachine::new(TestContext { counter: 0 }, None);
-        sm.init(TestState::State1).unwrap();
+        let mut sm =
+            StateMachine::new(TestState::State1, TestContext { counter: 0 }, None).unwrap();
 
-        assert_eq!(*sm.get_current_state().unwrap(), TestState::State1);
+        assert_eq!(*sm.get_current_state(), TestState::State1);
         match sm.process_event(&TestEvent::InvalidEvent) {
             Ok(_) => panic!("event1 should raise an error"),
             Err(Error::InvalidEvent(e)) => assert_eq!("cannot handle event1".to_string(), e),
             Err(e) => panic!("unexpected error {:?}", e),
         }
 
-        assert_eq!(*sm.get_current_state().unwrap(), TestState::State1);
+        assert_eq!(*sm.get_current_state(), TestState::State1);
 
         match sm.process_event(&TestEvent::TransitionToState2) {
             Ok(_) => panic!("first transition should fail"),
@@ -99,13 +99,13 @@ mod tests {
             Err(e) => panic!("unexpected error {:?}", e),
         }
 
-        assert_eq!(*sm.get_current_state().unwrap(), TestState::State1);
+        assert_eq!(*sm.get_current_state(), TestState::State1);
 
         match sm.process_event(&TestEvent::TransitionToState2) {
             Ok(_) => (),
             Err(e) => panic!("unexpected error {:?}", e),
         }
 
-        assert_eq!(*sm.get_current_state().unwrap(), TestState::State2);
+        assert_eq!(*sm.get_current_state(), TestState::State2);
     }
 }
