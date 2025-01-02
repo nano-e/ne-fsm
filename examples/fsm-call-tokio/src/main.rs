@@ -1,8 +1,8 @@
 // Import the async state machine module and dependencies
-use nefsm::Async::{self, FsmEnum, Stateful, Response};
-use tokio::sync::mpsc::{Receiver, channel, Sender};
-use std::fmt::Debug;
 use async_trait::async_trait;
+use nefsm::Async::{self, FsmEnum, Response, Stateful};
+use std::fmt::Debug;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 // Define the states for the telecom call
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -27,7 +27,9 @@ pub enum CallEvent {
 
 // Implement the FsmEnum trait for the CallState enum
 impl FsmEnum<CallState, CallContext, CallEvent> for CallState {
-    fn create(enum_value: &CallState) -> Box<dyn Stateful<CallState, CallContext, CallEvent> + Send> {
+    fn create(
+        enum_value: &CallState,
+    ) -> Box<dyn Stateful<CallState, CallContext, CallEvent> + Send> {
         match enum_value {
             CallState::Idle => Box::new(IdleState {}),
             CallState::Dialing => Box::new(DialingState {}),
@@ -67,14 +69,15 @@ impl Stateful<CallState, CallContext, CallEvent> for IdleState {
         Response::Handled
     }
 
-    async fn on_event(&mut self, event: &CallEvent, _context: &mut CallContext) -> Response<CallState> {
+    async fn on_event(
+        &mut self,
+        event: &CallEvent,
+        _context: &mut CallContext,
+    ) -> Response<CallState> {
         match event {
             CallEvent::Dial => Response::Transition(CallState::Dialing),
             CallEvent::IncomingCall => Response::Transition(CallState::Ringing),
-            _ => {
-                println!("Invalid event for Idle state");
-                Response::Handled
-            }
+            _ => Response::Error("Invalid event for Idle state".to_string()),
         }
     }
 
@@ -99,14 +102,15 @@ impl Stateful<CallState, CallContext, CallEvent> for DialingState {
         }
     }
 
-    async fn on_event(&mut self, event: &CallEvent, _context: &mut CallContext) -> Response<CallState> {
+    async fn on_event(
+        &mut self,
+        event: &CallEvent,
+        _context: &mut CallContext,
+    ) -> Response<CallState> {
         match event {
             CallEvent::Answer => Response::Transition(CallState::Connected),
             CallEvent::Reject => Response::Transition(CallState::Idle),
-            _ => {
-                println!("Invalid event for Dialing state");
-                Response::Handled
-            }
+            _ => Response::Error("Invalid event for Dialing state".to_string()),
         }
     }
 
@@ -125,14 +129,15 @@ impl Stateful<CallState, CallContext, CallEvent> for RingingState {
         Response::Handled
     }
 
-    async fn on_event(&mut self, event: &CallEvent, _context: &mut CallContext) -> Response<CallState> {
+    async fn on_event(
+        &mut self,
+        event: &CallEvent,
+        _context: &mut CallContext,
+    ) -> Response<CallState> {
         match event {
             CallEvent::Answer => Response::Transition(CallState::Connected),
             CallEvent::Reject => Response::Transition(CallState::Idle),
-            _ => {
-                println!("Invalid event for Ringing state");
-                Response::Handled
-            }
+            _ => Response::Error("Invalid event for Ringing state".to_string()),
         }
     }
 
@@ -151,14 +156,14 @@ impl Stateful<CallState, CallContext, CallEvent> for ConnectedState {
         Response::Handled
     }
 
-    async fn on_event(&mut self, event: &CallEvent, _context: &mut CallContext) -> Response<CallState> {
+    async fn on_event(
+        &mut self,
+        event: &CallEvent,
+        _context: &mut CallContext,
+    ) -> Response<CallState> {
         match event {
             CallEvent::HangUp => Response::Transition(CallState::Disconnected),
-            _ => {
-               
-                println!("Invalid event for Connected state");
-                Response::Handled
-            }
+            _ => Response::Error("Invalid event for Connected state".to_string()),
         }
     }
 
@@ -177,13 +182,14 @@ impl Stateful<CallState, CallContext, CallEvent> for DisconnectedState {
         Response::Handled
     }
 
-    async fn on_event(&mut self, event: &CallEvent, _context: &mut CallContext) -> Response<CallState> {
+    async fn on_event(
+        &mut self,
+        event: &CallEvent,
+        _context: &mut CallContext,
+    ) -> Response<CallState> {
         match event {
             CallEvent::Reset => Response::Transition(CallState::Idle),
-            _ => {
-                println!("Invalid event for Disconnected state");
-                Response::Handled
-            }
+            _ => Response::Error("Invalid event for Disconnected state".to_string()),
         }
     }
 
@@ -207,22 +213,19 @@ async fn event_receiver(
     mut call_state_machine: StateMachine<CallState, CallContext, CallEvent>,
     mut receiver: Receiver<CallEvent>,
 ) {
-    
     // Process events received from the event_generator
     while let Some(event) = receiver.recv().await {
-        call_state_machine.process_event(&event).await.unwrap();
+        match call_state_machine.process_event(&event).await {
+            Ok(_) => (),
+            Err(e) => println!("error: {:?}", e),
+        };
     }
 }
 
 #[tokio::main]
 async fn main() {
     // Initialize the state machine
-    let mut call_state_machine = StateMachine::new(
-        CallContext {
-            retries: 0,
-        },
-        None,
-    );
+    let mut call_state_machine = StateMachine::new(CallContext { retries: 0 }, None);
     call_state_machine.init(CallState::Idle).await;
 
     // Create a Tokio channel for sending and receiving events

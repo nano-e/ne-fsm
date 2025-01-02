@@ -1,5 +1,3 @@
-
-
 use nefsm;
 
 use nefsm::sync::EventHandler;
@@ -8,36 +6,27 @@ use nefsm::sync::Response;
 use nefsm::sync::Stateful;
 use rand::Rng;
 
-
-
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum State {
     Null,
     Starting,
-    Ready,        
+    Ready,
 }
 
 impl FsmEnum<State, Context, Event> for State {
     fn create(enum_value: &State) -> Box<dyn Stateful<State, Context, Event> + Send> {
         match enum_value {
             State::Null => Box::new(Null {}),
-            State::Starting => Box::new(Starting{}),
+            State::Starting => Box::new(Starting {}),
             State::Ready => Box::new(Ready {}),
         }
     }
 }
 
-pub struct Null {
+pub struct Null {}
+pub struct Starting {}
 
-}
-pub struct Starting {
-
-}
-
-pub struct Ready {
-
-}
-
+pub struct Ready {}
 
 pub struct GlobalStateTransitionHandler;
 
@@ -51,7 +40,7 @@ impl EventHandler<State, Context, Event> for GlobalStateTransitionHandler {
                     0 => State::Null,
                     1 => State::Starting,
                     2 => State::Ready,
-                    _ => panic!("Unexpected random value"),
+                    _ => return Response::Error("Unexpected random value".to_string()),
                 };
                 Response::Transition(next_state)
             }
@@ -59,7 +48,6 @@ impl EventHandler<State, Context, Event> for GlobalStateTransitionHandler {
         }
     }
 }
-
 
 // impl FsmEnum<State, Context, Event> for State{
 //     fn create<'a>(enum_value: &'a State) -> &'a mut Box<dyn Stateful<State, Context, Event>> {
@@ -73,10 +61,10 @@ impl EventHandler<State, Context, Event> for GlobalStateTransitionHandler {
 //         todo!()
 //     }
 // }
-impl ToString for State{
+impl ToString for State {
     fn to_string(&self) -> String {
         stringify!(self).to_owned()
-    } 
+    }
 }
 
 #[derive(Debug)]
@@ -87,11 +75,9 @@ pub enum Event {
 
 impl ToString for Event {
     fn to_string(&self) -> String {
-       stringify!(self).to_owned()
+        stringify!(self).to_owned()
     }
 }
-
-
 
 impl nefsm::sync::Stateful<State, Context, Event> for Null {
     fn on_enter(&mut self, context: &mut Context) -> nefsm::sync::Response<State> {
@@ -120,7 +106,7 @@ impl nefsm::sync::Stateful<State, Context, Event> for Starting {
         println!("Starting state on event : {:?}", event);
         match event {
             Event::Started => nefsm::sync::Response::Transition(State::Ready),
-            _ => nefsm::sync::Response::Handled
+            _ => nefsm::sync::Response::Error("invalid event".to_string()),
         }
     }
 
@@ -137,9 +123,9 @@ impl nefsm::sync::Stateful<State, Context, Event> for Ready {
 
     fn on_event(&mut self, event: &Event, context: &mut Context) -> nefsm::sync::Response<State> {
         println!("Ready state on event : {:?}", event);
-        match event{            
+        match event {
             Event::Disconnected => nefsm::sync::Response::Transition(State::Null),
-            _ => nefsm::sync::Response::Handled
+            _ => nefsm::sync::Response::Error("invalid event".to_string()),
         }
     }
 
@@ -150,20 +136,27 @@ impl nefsm::sync::Stateful<State, Context, Event> for Ready {
 
 #[derive(Debug)]
 pub struct Context {
-    retries: u32
+    retries: u32,
 }
 
 fn main() {
-    let mut state_machine = 
-        nefsm::sync::StateMachine::<State, Context, Event>::new (Context {retries : 0}, Some(Box::new(GlobalStateTransitionHandler{})));
-    
+    let mut state_machine = nefsm::sync::StateMachine::<State, Context, Event>::new(
+        Context { retries: 0 },
+        Some(Box::new(GlobalStateTransitionHandler {})),
+    );
+
     state_machine.init(State::Null);
 
-    let events =[Event::Started, Event::Disconnected, Event::Started, Event::Disconnected];
+    let events = [
+        Event::Started,
+        Event::Disconnected,
+        Event::Started,
+        Event::Disconnected,
+    ];
 
     for e in events.into_iter() {
         if let Err(e) = state_machine.process_event(&e) {
             println!("state machine error : {:?}", e);
-        }    
-    }    
+        }
+    }
 }
