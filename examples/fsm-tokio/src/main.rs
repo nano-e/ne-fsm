@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use nefsm::Async::{EventHandler, FsmEnum, Response, StateMachine, Stateful};
 use rand::Rng;
-use tokio::{sync::mpsc, time, task};
-use nefsm::Async::{FsmEnum, Stateful, StateMachine, EventHandler, Response};
+use tokio::{sync::mpsc, task, time};
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 pub enum State {
@@ -25,16 +25,10 @@ pub enum Event {
     E4,
 }
 
-struct StateA {
+struct StateA {}
+struct StateB {}
 
-}
-struct StateB {
-    
-}
-
-struct StateC {
-    
-}
+struct StateC {}
 #[async_trait]
 impl Stateful<State, Context, Event> for StateA {
     async fn on_enter(&mut self, context: &mut Context) -> Response<State> {
@@ -97,7 +91,9 @@ impl Event {
         let mut rng = rand::thread_rng();
         match rng.gen_range(0..4) {
             0 => Event::E1,
-            1 => Event::E2(Payload { f1: rng.gen_range(0..100) }),
+            1 => Event::E2(Payload {
+                f1: rng.gen_range(0..100),
+            }),
             2 => Event::E3,
             3 => Event::E4,
             _ => panic!("Invalid event"),
@@ -106,9 +102,6 @@ impl Event {
 }
 
 struct GlobalEventHandler;
-
-
-
 
 #[async_trait]
 impl EventHandler<State, Context, Event> for GlobalEventHandler {
@@ -156,7 +149,6 @@ impl FsmEnum<State, Context, Event> for State {
     }
 }
 
-
 // Rest of the state and event handling code remains unchanged
 
 #[tokio::main]
@@ -177,8 +169,13 @@ async fn main() {
         }
     });
 
-    let mut state_machine = StateMachine::<State, Context, Event>::new(Context { retries: 0 }, Some(Box::new(GlobalEventHandler)));
-    state_machine.init(State::StateA).await;    
+    let mut state_machine = StateMachine::<State, Context, Event>::new(
+        State::StateA,
+        Context { retries: 0 },
+        Some(Box::new(GlobalEventHandler)),
+    )
+    .await
+    .unwrap();
 
     let consumer = task::spawn(async move {
         while let Some(message) = rx.recv().await {

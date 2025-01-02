@@ -61,7 +61,7 @@ pub mod sync {
     // Define the StateMachine struct, which represents the finite state machine
     pub struct StateMachine<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> {
         states: HashMap<S, Box<dyn Stateful<S, CTX, E> + Send>>,
-        current_state: Option<S>,
+        current_state: S,
         context: CTX,
         global_event_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
     }
@@ -69,19 +69,42 @@ pub mod sync {
     // Implement methods for the StateMachine struct
     impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> StateMachine<S, CTX, E> {
         // Define a constructor for the StateMachine struct
-        pub fn new(context: CTX, handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>) -> Self {
-            let states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
-            Self {
+        pub fn new(
+            mut initial_state: S,
+            mut context: CTX,
+            handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
+        ) -> Result<Self, Error> {
+            let mut states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
+
+            loop {
+                let state = if let Some(existing_state) = states.get_mut(&initial_state) {
+                    existing_state
+                } else {
+                    let new_state = S::create(&initial_state);
+                    let current_state_clone = initial_state.clone();
+                    states.entry(current_state_clone).or_insert(new_state)
+                };
+
+                // TODO: maybe CTX should implement Clone to prevent side effects
+                // (clone context here and set later, if no Error is returned)
+                match state.on_enter(&mut context) {
+                    Response::Handled => break,
+                    Response::Error(e) => return Err(Error::StateInvalid(e)),
+                    Response::Transition(s) => initial_state = s,
+                }
+            }
+
+            Ok(Self {
                 states,
-                current_state: None,
+                current_state: initial_state,
                 context,
                 global_event_handler: handler,
-            }
+            })
         }
 
         // Define a method to get the current state
-        pub fn get_current_state(&self) -> Option<&S> {
-            self.current_state.as_ref()
+        pub fn get_current_state(&self) -> &S {
+            &self.current_state
         }
 
         // Define a method to get a reference to the context
@@ -89,66 +112,32 @@ pub mod sync {
             &self.context
         }
 
-        // Define a method to initialize the state machine with an initial state
-        // Note how the state objects are cached in a HashMap and not recreated every time we transition to this event.
-        pub fn init(&mut self, initial_state: S) -> Result<(), Error> {
-            if self.current_state.is_none() {
-                let mut next_state = Some(initial_state);
-                // TODO: maybe CTX should implement Clone to prevent side effects (clone self.context here and set later, according to state)
-                loop {
-                    let current_state_ref = next_state.as_ref().unwrap();
-                    let state = if let Some(existing_state) = self.states.get_mut(current_state_ref)
-                    {
-                        existing_state
-                    } else {
-                        let new_state = S::create(current_state_ref);
-                        let current_state_clone = next_state.clone().unwrap();
-                        self.states.entry(current_state_clone).or_insert(new_state)
-                    };
-
-                    match state.on_enter(&mut self.context) {
-                        Response::Handled => break,
-                        Response::Error(e) => return Err(Error::StateInvalid(e)),
-                        Response::Transition(s) => next_state = Some(s),
-                    }
-                }
-                self.current_state = next_state;
-            }
-            Ok(())
-        }
-
         // Define a method to process events and transition between states
         pub fn process_event(&mut self, event: &E) -> Result<(), Error> {
-            let c_state = match &self.current_state {
-                Some(state) => state,
-                None => return Err(Error::StateMachineNotInitialized),
-            };
-
             if let Some(global_handler) = &mut self.global_event_handler {
                 match global_handler.on_event(event, &mut self.context) {
                     Response::Handled => {}
                     Response::Error(s) => return Err(Error::InvalidEvent(s)),
                     Response::Transition(new_state) => {
-                        if new_state != *c_state {
+                        if new_state != self.current_state {
                             return self.transition_to(new_state);
                         }
                     }
                 }
             }
 
-            let current_state_ref = self.current_state.as_ref().unwrap();
-            let state = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+            let state = if let Some(existing_state) = self.states.get_mut(&self.current_state) {
                 existing_state
             } else {
-                let new_state = S::create(current_state_ref);
-                let current_state_clone = self.current_state.clone().unwrap();
+                let new_state = S::create(&self.current_state);
+                let current_state_clone = self.current_state.clone();
                 self.states.entry(current_state_clone).or_insert(new_state)
             };
             match state.on_event(event, &mut self.context) {
                 Response::Handled => Ok(()),
                 Response::Error(s) => Err(Error::InvalidEvent(s)),
                 Response::Transition(new_state) => {
-                    if new_state != *c_state {
+                    if new_state != self.current_state {
                         self.transition_to(new_state)?;
                     }
                     Ok(())
@@ -158,18 +147,16 @@ pub mod sync {
 
         // Define a method to handle state transitions
         fn transition_to(&mut self, new_state: S) -> Result<(), Error> {
-            let c_state = self.current_state.as_ref().unwrap();
-            let state = self.states.get_mut(&c_state).unwrap();
+            let state = self.states.get_mut(&self.current_state).unwrap();
             state.on_exit(&mut self.context);
 
-            let mut next_state = Some(new_state.clone());
+            let mut next_state = new_state.clone();
             loop {
-                let current_state_ref = next_state.as_ref().unwrap();
-                let s = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+                let s = if let Some(existing_state) = self.states.get_mut(&next_state) {
                     existing_state
                 } else {
-                    let new_state = S::create(current_state_ref);
-                    let current_state_clone = next_state.clone().unwrap();
+                    let new_state = S::create(&next_state);
+                    let current_state_clone = next_state.clone();
                     self.states.entry(current_state_clone).or_insert(new_state)
                 };
                 match s.on_enter(&mut self.context) {
@@ -178,10 +165,10 @@ pub mod sync {
                     }
                     Response::Error(e) => return Err(Error::StateInvalid(e)),
                     Response::Transition(s) => {
-                        if s == *next_state.as_ref().unwrap() {
+                        if s == next_state {
                             break;
                         } else {
-                            next_state = Some(s);
+                            next_state = s;
                         }
                     }
                 }
@@ -238,7 +225,7 @@ pub mod Async {
     // Define the StateMachine struct, which represents the finite state machine
     pub struct StateMachine<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> {
         states: HashMap<S, Box<dyn Stateful<S, CTX, E> + Send>>,
-        current_state: Option<S>,
+        current_state: S,
         context: CTX,
         global_event_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
     }
@@ -246,21 +233,42 @@ pub mod Async {
     // Implement methods for the StateMachine struct
     impl<S: Hash + PartialEq + Eq + Clone + FsmEnum<S, CTX, E>, CTX, E: Debug> StateMachine<S, CTX, E> {
         // Define a constructor for the StateMachine struct
-        pub fn new(
-            context: CTX,
-            global_handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
-        ) -> Self {
-            Self {
-                states: HashMap::new(),
-                current_state: None,
-                context,
-                global_event_handler: global_handler,
+        pub async fn new(
+            mut initial_state: S,
+            mut context: CTX,
+            handler: Option<Box<dyn EventHandler<S, CTX, E> + Send>>,
+        ) -> Result<Self, Error> {
+            let mut states = HashMap::<S, Box<dyn Stateful<S, CTX, E> + Send>>::new();
+
+            loop {
+                let state = if let Some(existing_state) = states.get_mut(&initial_state) {
+                    existing_state
+                } else {
+                    let new_state = S::create(&initial_state);
+                    let current_state_clone = initial_state.clone();
+                    states.entry(current_state_clone).or_insert(new_state)
+                };
+
+                // TODO: maybe CTX should implement Clone to prevent side effects
+                // (clone context here and set later, if no Error is returned)
+                match state.on_enter(&mut context).await {
+                    Response::Handled => break,
+                    Response::Error(e) => return Err(Error::StateInvalid(e)),
+                    Response::Transition(s) => initial_state = s,
+                }
             }
+
+            Ok(Self {
+                states,
+                current_state: initial_state,
+                context,
+                global_event_handler: handler,
+            })
         }
 
         // Define a method to get the current state
-        pub fn get_current_state(&self) -> Option<&S> {
-            self.current_state.as_ref()
+        pub fn get_current_state(&self) -> &S {
+            &self.current_state
         }
 
         // Define a method to get a reference to the context
@@ -268,45 +276,14 @@ pub mod Async {
             &self.context
         }
 
-        // Define a method to initialize the state machine with an initial state
-        pub async fn init(&mut self, initial_state: S) -> Result<(), Error> {
-            if self.current_state.is_none() {
-                let mut next_state = Some(initial_state);
-                // TODO: maybe CTX should implement Clone to prevent side effects (clone self.context here and set later, according to state)
-                loop {
-                    let current_state_ref = next_state.as_ref().unwrap();
-                    let state = if let Some(existing_state) = self.states.get_mut(current_state_ref)
-                    {
-                        existing_state
-                    } else {
-                        let new_state = S::create(current_state_ref);
-                        let current_state_clone = next_state.clone().unwrap();
-                        self.states.entry(current_state_clone).or_insert(new_state)
-                    };
-
-                    match state.on_enter(&mut self.context).await {
-                        Response::Handled => break,
-                        Response::Error(e) => return Err(Error::StateInvalid(e)),
-                        Response::Transition(s) => next_state = Some(s),
-                    }
-                }
-                self.current_state = next_state;
-            }
-            Ok(())
-        }
         // Define a method to process events and transition between states
         pub async fn process_event(&mut self, event: &E) -> Result<(), Error> {
-            let c_state = match &self.current_state {
-                Some(state) => state,
-                None => return Err(Error::StateMachineNotInitialized),
-            };
-
-            if let Some(ref mut handler) = self.global_event_handler {
-                match handler.on_event(event, &mut self.context).await {
+            if let Some(ref mut global_handler) = self.global_event_handler {
+                match global_handler.on_event(event, &mut self.context).await {
                     Response::Handled => {}
                     Response::Error(s) => return Err(Error::InvalidEvent(s)),
                     Response::Transition(new_state) => {
-                        if new_state != *c_state {
+                        if new_state != self.current_state {
                             self.transition_to(new_state).await;
                             return Ok(());
                         }
@@ -314,12 +291,11 @@ pub mod Async {
                 }
             }
 
-            let current_state_ref = self.current_state.as_ref().unwrap();
-            let state = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+            let state = if let Some(existing_state) = self.states.get_mut(&self.current_state) {
                 existing_state
             } else {
-                let new_state = S::create(current_state_ref);
-                let current_state_clone = self.current_state.clone().unwrap();
+                let new_state = S::create(&self.current_state);
+                let current_state_clone = self.current_state.clone();
                 self.states.entry(current_state_clone).or_insert(new_state)
             };
 
@@ -327,7 +303,7 @@ pub mod Async {
                 Response::Handled => Ok(()),
                 Response::Error(s) => Err(Error::InvalidEvent(s)),
                 Response::Transition(new_state) => {
-                    if new_state != *c_state {
+                    if new_state != self.current_state {
                         return self.transition_to(new_state).await;
                     }
                     Ok(())
@@ -336,18 +312,16 @@ pub mod Async {
         }
 
         async fn transition_to(&mut self, new_state: S) -> Result<(), Error> {
-            let c_state = self.current_state.as_ref().unwrap();
-            let state = self.states.get_mut(&c_state).unwrap();
+            let state = self.states.get_mut(&self.current_state).unwrap();
             state.on_exit(&mut self.context).await;
 
-            let mut next_state = Some(new_state.clone());
+            let mut next_state = new_state.clone();
             loop {
-                let current_state_ref = next_state.as_ref().unwrap();
-                let s = if let Some(existing_state) = self.states.get_mut(current_state_ref) {
+                let s = if let Some(existing_state) = self.states.get_mut(&next_state) {
                     existing_state
                 } else {
-                    let new_state = S::create(current_state_ref);
-                    let current_state_clone = next_state.clone().unwrap();
+                    let new_state = S::create(&next_state);
+                    let current_state_clone = next_state.clone();
                     self.states.entry(current_state_clone).or_insert(new_state)
                 };
 
@@ -357,10 +331,10 @@ pub mod Async {
                     }
                     Response::Error(e) => return Err(Error::StateInvalid(e)),
                     Response::Transition(s) => {
-                        if s == *current_state_ref {
+                        if s == next_state {
                             break;
                         } else {
-                            next_state = Some(s);
+                            next_state = s;
                         }
                     }
                 }

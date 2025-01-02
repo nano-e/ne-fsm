@@ -71,20 +71,14 @@ pub struct TestGlobalHandler {
 }
 
 impl nefsm::sync::EventHandler<TestState, TestContext, TestEvent> for TestGlobalHandler {
-    fn on_event(
-        &mut self,
-        event: &TestEvent,
-        context: &mut TestContext,
-    ) -> Response<TestState> {
+    fn on_event(&mut self, event: &TestEvent, context: &mut TestContext) -> Response<TestState> {
         match event {
             TestEvent::IncrementByTwo => {
                 context.transitions += 2;
                 self.handled_count += 1;
                 Response::Transition(TestState::B)
             }
-            _ => {
-                Response::Handled
-            }
+            _ => Response::Handled,
         }
     }
 }
@@ -98,12 +92,13 @@ mod tests {
     #[test]
     fn test_state_machine_initialization() {
         let mut fsm = StateMachine::<TestState, TestContext, TestEvent>::new(
+            TestState::A,
             TestContext { transitions: 0 },
             None,
-        );
-        assert!(fsm.get_current_state().is_none());
-        fsm.init(TestState::A).unwrap();
-        assert_eq!(fsm.get_current_state().unwrap(), &TestState::A);
+        )
+        .unwrap();
+
+        assert_eq!(fsm.get_current_state(), &TestState::A);
         assert_eq!(fsm.get_context().transitions, 1);
     }
 
@@ -111,45 +106,47 @@ mod tests {
     #[test]
     fn test_state_machine_transitions() {
         let mut fsm = StateMachine::<TestState, TestContext, TestEvent>::new(
+            TestState::A,
             TestContext { transitions: 0 },
             None,
-        );
-        fsm.init(TestState::A).unwrap();
+        )
+        .unwrap();
+
         fsm.process_event(&TestEvent::TransitionToB).unwrap();
-        assert_eq!(fsm.get_current_state().unwrap(), &TestState::B);
+        assert_eq!(fsm.get_current_state(), &TestState::B);
         assert_eq!(fsm.get_context().transitions, 2);
 
         fsm.process_event(&TestEvent::TransitionToC).unwrap();
-        assert_eq!(fsm.get_current_state().unwrap(), &TestState::C);
+        assert_eq!(fsm.get_current_state(), &TestState::C);
         assert_eq!(fsm.get_context().transitions, 3);
 
         fsm.process_event(&TestEvent::TransitionToA).unwrap();
-        assert_eq!(fsm.get_current_state().unwrap(), &TestState::A);
+        assert_eq!(fsm.get_current_state(), &TestState::A);
         assert_eq!(fsm.get_context().transitions, 4);
 
         fsm.process_event(&TestEvent::NoTransition).unwrap();
-        assert_eq!(fsm.get_current_state().unwrap(), &TestState::A);
+        assert_eq!(fsm.get_current_state(), &TestState::A);
         assert_eq!(fsm.get_context().transitions, 4);
     }
-    
+
     #[test]
     fn test_global_event_handler() {
         let context = TestContext { transitions: 0 };
         let global_handler = Box::new(TestGlobalHandler { handled_count: 0 });
 
         let mut sm = StateMachine::<TestState, TestContext, TestEvent>::new(
-            context, Some(global_handler)
-        );
-
-        sm.init(TestState::A).unwrap();
+            TestState::A,
+            context,
+            Some(global_handler),
+        )
+        .unwrap();
 
         // Trigger a global event
         sm.process_event(&TestEvent::IncrementByTwo).unwrap();
         let current_context = sm.get_context();
-        let current_state = sm.get_current_state().unwrap();
+        let current_state = sm.get_current_state();
 
         assert_eq!(current_context.transitions, 4);
         assert_eq!(*current_state, TestState::B);
     }
-
 }

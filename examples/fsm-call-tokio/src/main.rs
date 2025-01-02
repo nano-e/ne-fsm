@@ -225,8 +225,10 @@ async fn event_receiver(
 #[tokio::main]
 async fn main() {
     // Initialize the state machine
-    let mut call_state_machine = StateMachine::new(CallContext { retries: 0 }, None);
-    call_state_machine.init(CallState::Idle).await;
+    let mut call_state_machine =
+        StateMachine::new(CallState::Idle, CallContext { retries: 0 }, None)
+            .await
+            .unwrap();
 
     // Create a Tokio channel for sending and receiving events
     let (sender, receiver) = channel(100);
